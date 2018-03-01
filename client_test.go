@@ -88,8 +88,7 @@ func TestCanDisconnect(t *testing.T) {
 	go func() {
 		cer, err := tls.LoadX509KeyPair("test_resources/server.crt", "test_resources/server.key")
 		if err != nil {
-			log.Println(err)
-			return
+			t.Fatal(err)
 		}
 		config := &tls.Config{
 			Certificates: []tls.Certificate{cer},
@@ -138,6 +137,8 @@ func TestCanDisconnect(t *testing.T) {
 	if err := client.Disconnect(); err != nil {
 		t.Fatalf("couldn't disconnect: %s", err.Error())
 	}
+
+	assertStringsEqual(t, "Thrashh5, FeelsWayTooAmazingMan kinda", receivedMsg)
 }
 
 func TestCanNotDisconnectOnClosedConnection(t *testing.T) {
@@ -374,6 +375,62 @@ func TestCanReceiveROOMSTATEMessage(t *testing.T) {
 	}
 
 	assertStringsEqual(t, "10", receivedTag)
+}
+
+func TestCanReceiveUSERNOTICEMessage(t *testing.T) {
+	testMessage := "@badges=staff/1,broadcaster/1,turbo/1;color=#008000;display-name=ronni;emotes=;id=db25007f-7a18-43eb-9379-80131e44d633;login=ronni;mod=0;msg-id=resub;msg-param-months=6;msg-param-sub-plan=Prime;msg-param-sub-plan-name=Prime;room-id=1337;subscriber=1;system-msg=ronnimonths!;tmi-sent-ts=1507246572675;turbo=1;user-id=1337;user-type=staff :tmi.twitch.tv USERNOTICE #dallas :Great stream -- keep it up!"
+	wait := make(chan struct{})
+
+	go func() {
+		cer, err := tls.LoadX509KeyPair("test_resources/server.crt", "test_resources/server.key")
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		config := &tls.Config{
+			Certificates: []tls.Certificate{cer},
+		}
+		ln, err := tls.Listen("tcp", ":4331", config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		close(wait)
+		conn, err := ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ln.Close()
+
+		fmt.Fprintf(conn, "%s\r\n", testMessage)
+	}()
+
+	// wait for server to start
+	select {
+	case <-wait:
+	case <-time.After(time.Second * 3):
+		t.Fatal("server didn't start")
+	}
+
+	client := NewClient("justinfan123123", "oauth:123123132")
+	client.IrcAddress = ":4331"
+	go client.Connect()
+
+	waitMsg := make(chan string)
+	var receivedSubType string
+
+	client.OnNewUsernoticeMessage(func(channel string, user User, message Message) {
+		receivedSubType = message.Tags["msg-id"]
+		close(waitMsg)
+	})
+
+	// wait for server to start
+	select {
+	case <-waitMsg:
+	case <-time.After(time.Second * 3):
+		t.Fatal("no message sent")
+	}
+
+	assertStringsEqual(t, "resub", receivedSubType)
 }
 
 func TestCanSayMessage(t *testing.T) {

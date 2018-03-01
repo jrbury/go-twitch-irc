@@ -2,6 +2,7 @@ package twitch
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,12 @@ const (
 	CLEARCHAT = 2
 	// ROOMSTATE changes like sub mode
 	ROOMSTATE = 3
+	// USERNOTICE is when someone subs
+	USERNOTICE = 4
+	// USERSTATE when a user joins a channel or sends a PRIVMSG to a channel.
+	USERSTATE = 5
+	// INVALID is used to tag invalid messages
+	INVALID = 6
 )
 
 type message struct {
@@ -48,12 +55,10 @@ func parseMessage(line string) *message {
 			Text: line,
 		}
 	}
-	spl := strings.SplitN(line, " :", 3)
-	if len(spl) < 3 {
-		return getRoomstateMessage(line)
-	}
+
+	tags, middle, text := splitLine(line)
+
 	action := false
-	tags, middle, text := spl[0], spl[1], spl[2]
 	if strings.HasPrefix(text, "\u0001ACTION ") {
 		action = true
 		text = text[8:]
@@ -65,22 +70,23 @@ func parseMessage(line string) *message {
 		Action: action,
 	}
 	msg.Username, msg.Type, msg.Channel = parseMiddle(middle)
-	parseTags(msg, tags[1:])
-	if msg.Type == CLEARCHAT {
-		msg.Username = "twitch"
-		targetUser := msg.Text
-		seconds, _ := strconv.Atoi(msg.Tags["ban-duration"])
+	if msg.Type != INVALID {
+		parseTags(msg, tags[1:])
+		if msg.Type == CLEARCHAT {
+			msg.Username = "twitch"
+			targetUser := msg.Text
+			seconds, _ := strconv.Atoi(msg.Tags["ban-duration"])
 
-		msg.Text = fmt.Sprintf("%s was timed out for %s: %s",
-			targetUser,
-			time.Duration(time.Duration(seconds)*time.Second),
-			msg.Tags["ban-reason"])
+			msg.Text = fmt.Sprintf("%s was timed out for %s: %s",
+				targetUser,
+				time.Duration(time.Duration(seconds)*time.Second),
+				msg.Tags["ban-reason"])
+		}
 	}
 	return msg
 }
 
 func getRoomstateMessage(line string) *message {
-
 	msg := &message{}
 	msg.Type = ROOMSTATE
 	msg.Tags = make(map[string]string)
@@ -101,40 +107,55 @@ func getRoomstateMessage(line string) *message {
 	return msg
 }
 
+func splitLine(line string) (string, string, string) {
+	spl := strings.SplitN(line, " :", 3)
+
+	switch len(spl) {
+	case 2:
+		return spl[0], spl[1], ""
+	case 3:
+		return spl[0], spl[1], spl[2]
+	default:
+		return "", "", line // we don't have what we expect, return the line as text
+	}
+}
+
+// The main reason for using regex vs splitting is to reduce the edge cases
+// that needed to be accounted for
 func parseMiddle(middle string) (string, msgType, string) {
 	var username string
-	var msgType msgType
+	var msgType msgType = INVALID
 	var channel string
 
-	for i, c := range middle {
-		if c == '!' {
-			username = middle[:i]
-			middle = middle[i:]
+	userRe := regexp.MustCompile(`@([a-z0-9]+)\.tmi\.twitch\.tv`)
+	userMatch := userRe.FindStringSubmatch(middle)
+	if len(userMatch) > 1 {
+		username = userMatch[1]
+	}
+
+	typeRe := regexp.MustCompile(`\s([A-Z]+)\s`)
+	typeMatch := typeRe.FindStringSubmatch(middle)
+	if len(typeMatch) > 1 {
+		switch typeMatch[1] {
+		case "PRIVMSG":
+			msgType = PRIVMSG
+		case "WHISPER":
+			msgType = WHISPER
+		case "CLEARCHAT":
+			msgType = CLEARCHAT
+		case "ROOMSTATE":
+			msgType = ROOMSTATE
+		case "USERSTATE":
+			msgType = USERSTATE
+		case "USERNOTICE":
+			msgType = USERNOTICE
 		}
 	}
-	start := -1
-	for i, c := range middle {
-		if c == ' ' {
-			if start == -1 {
-				start = i + 1
-			} else {
-				typ := middle[start:i]
-				switch typ {
-				case "PRIVMSG":
-					msgType = PRIVMSG
-				case "WHISPER":
-					msgType = WHISPER
-				case "CLEARCHAT":
-					msgType = CLEARCHAT
-				}
-				middle = middle[i:]
-			}
-		}
-	}
-	for i, c := range middle {
-		if c == '#' {
-			channel = middle[i+1:]
-		}
+
+	channelRe := regexp.MustCompile(`#([a-z0-9]+)$`)
+	channelMatch := channelRe.FindStringSubmatch(middle)
+	if len(channelMatch) > 1 {
+		channel = channelMatch[1]
 	}
 
 	return username, msgType, channel

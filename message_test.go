@@ -92,3 +92,50 @@ func TestCanParseEmoteMessage(t *testing.T) {
 
 	assertIntsEqual(t, 1, len(message.Emotes))
 }
+
+func TestParseUsernameMiddleRegex(t *testing.T) {
+	testMessage := "thexin1!thexin1@thexin1.tmi.twitch.tv PRIVMSG #n1nja"
+	username, mType, channel := parseMiddle(testMessage)
+
+	assertStringsEqual(t, "thexin1", username)
+	assertIntsEqual(t, int(PRIVMSG), int(mType))
+	assertStringsEqual(t, "n1nja", channel)
+}
+
+func TestParseNoUserMiddleRegex(t *testing.T) {
+	testMessage := "tmi.twitch.tv ROOMSTATE #dallas"
+	username, mType, channel := parseMiddle(testMessage)
+
+	assertStringsEqual(t, "", username)
+	assertIntsEqual(t, int(ROOMSTATE), int(mType))
+	assertStringsEqual(t, "dallas", channel)
+}
+
+func TestCanParseUsernoticeResubMessage(t *testing.T) {
+	testMessage := `@badges=staff/1,broadcaster/1,turbo/1;color=#008000;display-name=ronni;emotes=;id=db25007f-7a18-43eb-9379-80131e44d633;login=ronni;mod=0;msg-id=resub;msg-param-months=6;msg-param-sub-plan=Prime;msg-param-sub-plan-name=Prime;room-id=1337;subscriber=1;system-msg=ronni\shas\ssubscribed\sfor\s6\smonths!;tmi-sent-ts=1507246572675;turbo=1;user-id=1337;user-type=staff :tmi.twitch.tv USERNOTICE #dallas :Great stream -- keep it up!`
+
+	message := parseMessage(testMessage)
+
+	assertIntsEqual(t, int(USERNOTICE), int(message.Type))
+	assertStringsEqual(t, "dallas", message.Channel)
+	assertStringsEqual(t, "ronni", message.Tags["login"])
+	assertStringsEqual(t, "resub", message.Tags["msg-id"])
+	assertStringsEqual(t, "Prime", message.Tags["msg-param-sub-plan"])
+	assertStringsEqual(t, "6", message.Tags["msg-param-months"])
+	assertStringsEqual(t, "Great stream -- keep it up!", message.Text)
+}
+
+func TestCanParseUsernoticeGiftSubMessage(t *testing.T) {
+	testMessage := `@badges=subscriber/24,bits/25000;color=#2E8B57;display-name=TheXin1;emotes=;id=2dd9310c-1bcb-494f-929c-d0d222e245d3;login=thexin1;mod=0;msg-id=subgift;msg-param-months=1;msg-param-recipient-display-name=Fuse404;msg-param-recipient-id=36547385;msg-param-recipient-user-name=fuse404;msg-param-sub-plan-name=Channel\sSubscription\s(theattack);msg-param-sub-plan=1000;room-id=41226075;subscriber=1;system-msg=TheXin1\sgifted\sa\s$4.99\ssub\sto\sFuse404!;tmi-sent-ts=1519844687512;turbo=0;user-id=30403955;user-type= :tmi.twitch.tv USERNOTICE #theattack`
+
+	message := parseMessage(testMessage)
+
+	assertIntsEqual(t, int(USERNOTICE), int(message.Type))
+	assertStringsEqual(t, "theattack", message.Channel)
+	assertStringsEqual(t, "thexin1", message.Tags["login"])
+	assertStringsEqual(t, "subgift", message.Tags["msg-id"])
+	assertStringsEqual(t, "1000", message.Tags["msg-param-sub-plan"])
+	assertStringsEqual(t, "1", message.Tags["msg-param-months"])
+	assertStringsEqual(t, "fuse404", message.Tags["msg-param-recipient-user-name"])
+	assertStringsEqual(t, "", message.Text)
+}
