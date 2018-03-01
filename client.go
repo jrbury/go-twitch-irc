@@ -197,6 +197,13 @@ func (c *Client) handleLine(line string) {
 			Badges:      message.Badges,
 		}
 
+		// For notice events like sub, new chatter, etc username is not in the normal spot
+		// but it is included in the tags as login, which is the user who initiated the event
+		// AKA the gifter for a gifted sub
+		if User.Username == "" {
+			User.Username = message.Tags["login"]
+		}
+
 		clientMessage := &Message{
 			Type:   message.Type,
 			Time:   message.Time,

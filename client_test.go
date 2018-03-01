@@ -419,6 +419,7 @@ func TestCanReceiveUSERNOTICEMessage(t *testing.T) {
 
 	client.OnNewUsernoticeMessage(func(channel string, user User, message Message) {
 		receivedSubType = message.Tags["msg-id"]
+		assertStringsEqual(t, "ronni", user.Username)
 		close(waitMsg)
 	})
 
