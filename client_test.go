@@ -103,7 +103,6 @@ func TestCanDisconnect(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer ln.Close()
-		defer conn.Close()
 
 		fmt.Fprintf(conn, "%s\r\n", testMessage)
 	}()
