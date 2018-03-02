@@ -127,7 +127,7 @@ func parseMiddle(middle string) (string, msgType, string) {
 	var msgType msgType = INVALID
 	var channel string
 
-	userRe := regexp.MustCompile(`@([a-z0-9]+)\.tmi\.twitch\.tv`)
+	userRe := regexp.MustCompile(`@([a-z0-9_]+)\.tmi\.twitch\.tv`)
 	userMatch := userRe.FindStringSubmatch(middle)
 	if len(userMatch) > 1 {
 		username = userMatch[1]
