@@ -139,3 +139,27 @@ func TestCanParseUsernoticeGiftSubMessage(t *testing.T) {
 	assertStringsEqual(t, "fuse404", message.Tags["msg-param-recipient-user-name"])
 	assertStringsEqual(t, "", message.Text)
 }
+
+func TestCanParseRoomstateMessage(t *testing.T) {
+	testMessage := `@broadcaster-lang=<broadcaster-lang>;r9k=<r9k>;slow=<slow>;subs-only=<subs-only> :tmi.twitch.tv ROOMSTATE #nothing`
+
+	message := parseMessage(testMessage)
+
+	if message.Type != ROOMSTATE {
+		t.Error("parsing ROOMSTATE message failed")
+	}
+
+	assertStringsEqual(t, message.Channel, "nothing")
+}
+
+func TestCanParseUserNoticeRaidMessage(t *testing.T) {
+	testMessage := `@badges=turbo/1;color=#9ACD32;display-name=TestChannel;emotes=;id=3d830f12-795c-447d-af3c-ea05e40fbddb;login=testchannel;mod=0;msg-id=raid;msg-param-displayName=TestChannel;msg-param-login=testchannel;msg-param-viewerCount=15;room-id=56379257;subscriber=0;system-msg=15\sraiders\sfrom\sTestChannel\shave\sjoined\n!;tmi-sent-ts=1507246572675;tmi-sent-ts=1507246572675;turbo=1;user-id=123456;user-type= :tmi.twitch.tv USERNOTICE #othertestchannel`
+	message := parseMessage(testMessage)
+
+	if message.Type != USERNOTICE {
+		t.Error("parsing USERNOTICE message failed")
+	}
+
+	assertStringsEqual(t, message.Tags["msg-id"], "raid")
+	assertStringsEqual(t, message.Channel, "othertestchannel")
+}

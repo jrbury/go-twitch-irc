@@ -86,27 +86,6 @@ func parseMessage(line string) *message {
 	return msg
 }
 
-func getRoomstateMessage(line string) *message {
-	msg := &message{}
-	msg.Type = ROOMSTATE
-	msg.Tags = make(map[string]string)
-
-	tagsString := strings.Split(strings.TrimPrefix(line, "@"), " :tmi.twitch.tv ROOMSTATE")
-	tags := strings.Split(tagsString[0], ";")
-	for _, tag := range tags {
-		tagSplit := strings.Split(tag, "=")
-
-		value := ""
-		if len(tagSplit) > 1 {
-			value = tagSplit[1]
-		}
-
-		msg.Tags[tagSplit[0]] = value
-	}
-
-	return msg
-}
-
 func splitLine(line string) (string, string, string) {
 	spl := strings.SplitN(line, " :", 3)
 
