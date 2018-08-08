@@ -631,7 +631,7 @@ func TestCanJoinChannel(t *testing.T) {
 	client.IrcAddress = ":4326"
 	go client.Connect()
 
-	client.Join("gempir")
+	client.Join("gempiR")
 
 	// wait for server to receive message
 	select {
