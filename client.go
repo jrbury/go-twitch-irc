@@ -116,7 +116,7 @@ func (c *Client) OnNewUsernoticeMessage(callback func(channel string, user User,
 	c.onNewUsernoticeMessage = callback
 }
 
-// OnNewUsernoticeMessage attach callback to new notice message such as hosts
+// OnNewNoticeMessage attach callback to new notice message such as hosts
 func (c *Client) OnNewNoticeMessage(callback func(channel string, user User, message Message)) {
 	c.onNewNoticeMessage = callback
 }
@@ -321,6 +321,8 @@ func (c *Client) send(line string) {
 // Errors returned from handleLine break out of readConnections, which starts a reconnect
 // This means that we should only return fatal errors as errors here
 func (c *Client) handleLine(line string) error {
+	fmt.Println("<", line)
+
 	if strings.HasPrefix(line, "PING") {
 		c.send(strings.Replace(line, "PING", "PONG", 1))
 
@@ -329,6 +331,7 @@ func (c *Client) handleLine(line string) error {
 
 	if strings.HasPrefix(line, "@") {
 		channel, user, clientMessage := ParseMessage(line)
+		fmt.Println("parsed:", channel, user, clientMessage)
 
 		switch clientMessage.Type {
 		case PRIVMSG:
