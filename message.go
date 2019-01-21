@@ -138,7 +138,7 @@ func parseMiddle(middle string) (string, MessageType, string) {
 		}
 	}
 
-	channelRe := regexp.MustCompile(`#([a-zA-Z0-9_]+)$`)
+	channelRe := regexp.MustCompile(`#([a-z0-9_]+)$`)
 	channelMatch := channelRe.FindStringSubmatch(middle)
 	if len(channelMatch) > 1 {
 		channel = channelMatch[1]
