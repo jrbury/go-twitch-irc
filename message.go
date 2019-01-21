@@ -8,29 +8,34 @@ import (
 	"time"
 )
 
-type msgType int
+// MessageType different message types possible to receive via IRC
+type MessageType int
 
 const (
+	// UNSET default type
+	UNSET MessageType = -1
 	// WHISPER private messages
-	WHISPER msgType = 0
+	WHISPER MessageType = 0
 	// PRIVMSG standard chat message
-	PRIVMSG msgType = 1
+	PRIVMSG MessageType = 1
 	// CLEARCHAT timeout messages
-	CLEARCHAT = 2
+	CLEARCHAT MessageType = 2
 	// ROOMSTATE changes like sub mode
-	ROOMSTATE = 3
-	// USERNOTICE is when someone subs
-	USERNOTICE = 4
-	// USERSTATE when a user joins a channel or sends a PRIVMSG to a channel.
-	USERSTATE = 5
-	// INVALID is used to tag invalid messages
-	INVALID = 6
+	ROOMSTATE MessageType = 3
+	// USERNOTICE messages like subs, resubs, raids, etc
+	USERNOTICE MessageType = 4
+	// USERSTATE messages
+	USERSTATE MessageType = 5
+	// NOTICE messages like sub mode, host on
+	NOTICE MessageType = 6
 )
 
 type message struct {
-	Type        msgType
+	Type        MessageType
 	Time        time.Time
 	Channel     string
+	ChannelID   string
+	UserID      string
 	Username    string
 	DisplayName string
 	UserType    string
@@ -40,6 +45,7 @@ type message struct {
 	Emotes      []*Emote
 	Tags        map[string]string
 	Text        string
+	Raw         string
 }
 
 // Emote twitch emotes
@@ -53,6 +59,8 @@ func parseMessage(line string) *message {
 	if !strings.HasPrefix(line, "@") {
 		return &message{
 			Text: line,
+			Raw:  line,
+			Type: UNSET,
 		}
 	}
 
@@ -61,28 +69,23 @@ func parseMessage(line string) *message {
 	action := false
 	if strings.HasPrefix(text, "\u0001ACTION ") {
 		action = true
-		text = text[8:]
+		text = text[8 : len(text)-1]
 	}
 	msg := &message{
-		Time:   time.Now(),
 		Text:   text,
 		Tags:   map[string]string{},
 		Action: action,
+		Type:   UNSET,
 	}
 	msg.Username, msg.Type, msg.Channel = parseMiddle(middle)
-	if msg.Type != INVALID {
-		parseTags(msg, tags[1:])
-		if msg.Type == CLEARCHAT {
-			msg.Username = "twitch"
-			targetUser := msg.Text
-			seconds, _ := strconv.Atoi(msg.Tags["ban-duration"])
+	parseTags(msg, tags[1:])
+	if msg.Type == CLEARCHAT {
+		targetUser := msg.Text
+		msg.Username = targetUser
 
-			msg.Text = fmt.Sprintf("%s was timed out for %s: %s",
-				targetUser,
-				time.Duration(time.Duration(seconds)*time.Second),
-				msg.Tags["ban-reason"])
-		}
+		msg.Text = fmt.Sprintf("%s was timed out for %s: %s", targetUser, msg.Tags["ban-duration"], msg.Tags["ban-reason"])
 	}
+	msg.Raw = line
 	return msg
 }
 
@@ -101,9 +104,9 @@ func splitLine(line string) (string, string, string) {
 
 // The main reason for using regex vs splitting is to reduce the edge cases
 // that needed to be accounted for
-func parseMiddle(middle string) (string, msgType, string) {
+func parseMiddle(middle string) (string, MessageType, string) {
 	var username string
-	var msgType msgType = INVALID
+	var msgType MessageType
 	var channel string
 
 	userRe := regexp.MustCompile(`@([a-z0-9_]+)\.tmi\.twitch\.tv`)
@@ -122,12 +125,16 @@ func parseMiddle(middle string) (string, msgType, string) {
 			msgType = WHISPER
 		case "CLEARCHAT":
 			msgType = CLEARCHAT
+		case "NOTICE":
+			msgType = NOTICE
 		case "ROOMSTATE":
 			msgType = ROOMSTATE
 		case "USERSTATE":
 			msgType = USERSTATE
 		case "USERNOTICE":
 			msgType = USERNOTICE
+		default:
+			msgType = UNSET
 		}
 	}
 
@@ -142,8 +149,13 @@ func parseMiddle(middle string) (string, msgType, string) {
 
 func parseTags(msg *message, tagsRaw string) {
 	tags := strings.Split(tagsRaw, ";")
+
 	for _, tag := range tags {
 		spl := strings.SplitN(tag, "=", 2)
+		if len(spl) != 2 {
+			continue
+		}
+
 		value := strings.Replace(spl[1], "\\:", ";", -1)
 		value = strings.Replace(value, "\\s", " ", -1)
 		value = strings.Replace(value, "\\\\", "\\", -1)
@@ -158,9 +170,19 @@ func parseTags(msg *message, tagsRaw string) {
 			msg.Emotes = parseTwitchEmotes(value, msg.Text)
 		case "user-type":
 			msg.UserType = value
-		default:
-			msg.Tags[spl[0]] = value
+		case "tmi-sent-ts":
+			i, err := strconv.ParseInt(value, 10, 64)
+			if err == nil {
+				msg.Time = time.Unix(0, int64(i*1e6))
+			}
+		case "room-id":
+			msg.ChannelID = value
+		case "target-user-id":
+			msg.UserID = value
+		case "user-id":
+			msg.UserID = value
 		}
+		msg.Tags[spl[0]] = value
 	}
 }
 
@@ -204,4 +226,19 @@ func parseTwitchEmotes(emoteTag, text string) []*Emote {
 		emotes = append(emotes, e)
 	}
 	return emotes
+}
+
+func parseJoinPart(text string) (string, string) {
+	username := strings.Split(text, "!")
+	channel := strings.Split(username[1], "#")
+	return strings.Trim(channel[1], " "), strings.Trim(username[0], " :")
+}
+
+func parseNames(text string) (string, []string) {
+	lines := strings.Split(text, ":")
+	channelDirty := strings.Split(lines[1], "#")
+	channel := strings.Trim(channelDirty[1], " ")
+	users := strings.Split(lines[2], " ")
+
+	return channel, users
 }
