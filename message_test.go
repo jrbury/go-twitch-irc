@@ -9,6 +9,7 @@ func TestCanParseMessage(t *testing.T) {
 	message := parseMessage(testMessage)
 
 	assertStringsEqual(t, "pajlada", message.Channel)
+	assertStringsEqual(t, "78424343", message.UserID)
 	assertIntsEqual(t, 6, message.Badges["subscriber"])
 	assertStringsEqual(t, "#FF0000", message.Color)
 	assertStringsEqual(t, "Redflamingo13", message.DisplayName)
@@ -24,7 +25,7 @@ func TestCanParseMessage(t *testing.T) {
 }
 
 func TestCanParseActionMessage(t *testing.T) {
-	testMessage := "@badges=subscriber/6,premium/1;color=#FF0000;display-name=Redflamingo13;emotes=;id=2a31a9df-d6ff-4840-b211-a2547c7e656e;mod=0;room-id=11148817;subscriber=1;tmi-sent-ts=1490382457309;turbo=0;user-id=78424343;user-type= :redflamingo13!redflamingo13@redflamingo13.tmi.twitch.tv PRIVMSG #pajlada :\u0001ACTION Thrashh5, FeelsWayTooAmazingMan kinda"
+	testMessage := "@badges=subscriber/6,premium/1;color=#FF0000;display-name=Redflamingo13;emotes=;id=2a31a9df-d6ff-4840-b211-a2547c7e656e;mod=0;room-id=11148817;subscriber=1;tmi-sent-ts=1490382457309;turbo=0;user-id=78424343;user-type= :redflamingo13!redflamingo13@redflamingo13.tmi.twitch.tv PRIVMSG #pajlada :\u0001ACTION Thrashh5, FeelsWayTooAmazingMan kinda\u0001"
 	message := parseMessage(testMessage)
 
 	assertStringsEqual(t, "pajlada", message.Channel)
@@ -83,6 +84,20 @@ func TestCanParseClearChatMessage(t *testing.T) {
 	if message.Type != CLEARCHAT {
 		t.Error("parsing CLEARCHAT message failed")
 	}
+
+	assertStringsEqual(t, message.Channel, "pajlada")
+}
+
+func TestCanParseClearChatMessage2(t *testing.T) {
+	testMessage := `@room-id=11148817;tmi-sent-ts=1527342985836 :tmi.twitch.tv CLEARCHAT #pajlada`
+
+	message := parseMessage(testMessage)
+
+	if message.Type != CLEARCHAT {
+		t.Error("parsing CLEARCHAT message failed")
+	}
+
+	assertStringsEqual(t, message.Channel, "pajlada")
 }
 
 func TestCanParseEmoteMessage(t *testing.T) {
@@ -140,16 +155,16 @@ func TestCanParseUsernoticeGiftSubMessage(t *testing.T) {
 	assertStringsEqual(t, "", message.Text)
 }
 
-func TestCanParseRoomstateMessage(t *testing.T) {
-	testMessage := `@broadcaster-lang=<broadcaster-lang>;r9k=<r9k>;slow=<slow>;subs-only=<subs-only> :tmi.twitch.tv ROOMSTATE #nothing`
-
+func TestCanParseUserNoticeMessage(t *testing.T) {
+	testMessage := `@badges=moderator/1,subscriber/24,premium/1;color=#33FFFF;display-name=Baxx;emotes=;id=4d737a10-03ff-48a7-aca1-a5624ebac91d;login=baxx;mod=1;msg-id=subgift;msg-param-months=7;msg-param-recipient-display-name=Nclnat;msg-param-recipient-id=84027795;msg-param-recipient-user-name=nclnat;msg-param-sender-count=7;msg-param-sub-plan-name=look\sat\sthose\sshitty\semotes,\srip\s$5\sLUL;msg-param-sub-plan=1000;room-id=11148817;subscriber=1;system-msg=Baxx\sgifted\sa\sTier\s1\ssub\sto\sNclnat!\sThey\shave\sgiven\s7\sGift\sSubs\sin\sthe\schannel!;tmi-sent-ts=1527341500077;turbo=0;user-id=59504812;user-type=mod :tmi.twitch.tv USERNOTICE #pajlada`
 	message := parseMessage(testMessage)
 
-	if message.Type != ROOMSTATE {
-		t.Error("parsing ROOMSTATE message failed")
+	if message.Type != USERNOTICE {
+		t.Error("parsing USERNOTICE message failed")
 	}
 
-	assertStringsEqual(t, message.Channel, "nothing")
+	assertStringsEqual(t, message.Tags["msg-id"], "subgift")
+	assertStringsEqual(t, message.Channel, "pajlada")
 }
 
 func TestCanParseUserNoticeRaidMessage(t *testing.T) {
@@ -162,4 +177,35 @@ func TestCanParseUserNoticeRaidMessage(t *testing.T) {
 
 	assertStringsEqual(t, message.Tags["msg-id"], "raid")
 	assertStringsEqual(t, message.Channel, "othertestchannel")
+}
+
+func TestCanParseRoomstateMessage(t *testing.T) {
+	testMessage := `@broadcaster-lang=<broadcaster-lang>;r9k=<r9k>;slow=<slow>;subs-only=<subs-only> :tmi.twitch.tv ROOMSTATE #nothing`
+
+	message := parseMessage(testMessage)
+
+	if message.Type != ROOMSTATE {
+		t.Error("parsing ROOMSTATE message failed")
+	}
+
+	assertStringsEqual(t, message.Channel, "nothing")
+}
+
+func TestCanParseJoinPart(t *testing.T) {
+	testMessage := `:username123!username123@username123.tmi.twitch.tv JOIN #mychannel`
+
+	channel, username := parseJoinPart(testMessage)
+
+	assertStringsEqual(t, channel, "mychannel")
+	assertStringsEqual(t, username, "username123")
+}
+
+func TestCanParseNames(t *testing.T) {
+	testMessage := `:myusername123.tmi.twitch.tv 353 myusername123 = #mychannel :username1 username2 username3 username4`
+	expectedUsers := []string{"username1", "username2", "username3", "username4"}
+
+	channel, users := parseNames(testMessage)
+
+	assertStringsEqual(t, channel, "mychannel")
+	assertStringSlicesEqual(t, expectedUsers, users)
 }
