@@ -321,8 +321,6 @@ func (c *Client) send(line string) {
 // Errors returned from handleLine break out of readConnections, which starts a reconnect
 // This means that we should only return fatal errors as errors here
 func (c *Client) handleLine(line string) error {
-	fmt.Println("<", line)
-
 	if strings.HasPrefix(line, "PING") {
 		c.send(strings.Replace(line, "PING", "PONG", 1))
 
@@ -331,7 +329,6 @@ func (c *Client) handleLine(line string) error {
 
 	if strings.HasPrefix(line, "@") {
 		channel, user, clientMessage := ParseMessage(line)
-		fmt.Println("parsed:", channel, user, clientMessage)
 
 		switch clientMessage.Type {
 		case PRIVMSG:

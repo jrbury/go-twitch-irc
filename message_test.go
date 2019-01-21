@@ -24,6 +24,13 @@ func TestCanParseMessage(t *testing.T) {
 	assertFalse(t, message.Action, "parsing action failed")
 }
 
+func TestCanParseMessageMissingChannelRegression(t *testing.T) {
+	testMessage := "@badges=broadcaster/1,bits-charity/1;color=#2E8B57;display-name=The_Xin;emotes=;flags=;id=9f7b3403-fa40-460f-985e-f1d01b31c196;mod=0;room-id=30403955;subscriber=0;tmi-sent-ts=1548100172162;turbo=0;user-id=30403955;user-type= :the_xin!the_xin@the_xin.tmi.twitch.tv PRIVMSG #the_xin :test"
+	message := parseMessage(testMessage)
+
+	assertStringsEqual(t, "the_xin", message.Channel)
+}
+
 func TestCanParseActionMessage(t *testing.T) {
 	testMessage := "@badges=subscriber/6,premium/1;color=#FF0000;display-name=Redflamingo13;emotes=;id=2a31a9df-d6ff-4840-b211-a2547c7e656e;mod=0;room-id=11148817;subscriber=1;tmi-sent-ts=1490382457309;turbo=0;user-id=78424343;user-type= :redflamingo13!redflamingo13@redflamingo13.tmi.twitch.tv PRIVMSG #pajlada :\u0001ACTION Thrashh5, FeelsWayTooAmazingMan kinda\u0001"
 	message := parseMessage(testMessage)
